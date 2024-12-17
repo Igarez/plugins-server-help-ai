@@ -46,33 +46,43 @@ const removeUnwantedElements = (_cheerio: any) => {
 };
 
 const fetchAndCleanContent = async (url: string) => {
-  const { body } = await got(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Connection": "keep-alive",
-      "Referer": "https://www.google.com"
-    },
-    timeout: 15000 // Timeout aumentado a 15 segundos
-  });
+  try {
+    const { body } = await got(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Connection": "keep-alive",
+        "Referer": "https://www.google.com"
+      },
+      timeout: 10000 // 10 segundos
+    });
 
-  const $ = cheerio.load(body);
-  const title = $('title').text() || 'No title found'; // Título por defecto si está vacío
+    // Verifica el contenido recibido
+    console.log("Response body type:", typeof body);
+    console.log("Response body content:", body ? body.slice(0, 100) : "No body"); // Solo muestra los primeros 100 caracteres
 
-  removeUnwantedElements($);
+    const $ = cheerio.load(body);
+    const title = $('title').text() || 'No title found';
 
-  const doc = new JSDOM($.html(), { url });
-  const reader = new Readability(doc.window.document);
-  const article = reader.parse();
+    removeUnwantedElements($);
 
-  // Validación para evitar errores
-  if (!article || !article.textContent) {
-    throw new Error("Failed to extract article content: No valid content found.");
+    const doc = new JSDOM($.html(), { url });
+    const reader = new Readability(doc.window.document);
+    const article = reader.parse();
+
+    if (!article || !article.textContent) {
+      throw new Error("Failed to extract article content: No valid content found.");
+    }
+
+    return { title, content: article.textContent.trim() };
+
+  } catch (error) {
+    console.error("Error in fetchAndCleanContent: ", error);
+    throw error; // Re-lanza el error para ser manejado por el llamado del API
   }
-
-  return { title, content: article.textContent.trim() };
 };
+
 
 export const articleReaderRouter: Router = (() => {
   const router = express.Router();
